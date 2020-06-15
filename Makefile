@@ -1,7 +1,7 @@
 WARNS=-Wextra -Wall -Wundef  -Wfloat-equal -Wshadow -Wpointer-arith -Wcast-align -Wstrict-prototypes -Wstrict-overflow=5 -Wwrite-strings -Waggregate-return -Wcast-qual -Wswitch-default -Wswitch-enum -Wconversion -Wunreachable-code
 CC=mpicc
 # OMP_NUM_THREADS=12
-CFLAGS=$(WARNS) -O0 -lm # -fopenmp
+CFLAGS=$(WARNS) --std=c99 -O0 -lSDL2 -lm # -fopenmp
 
 info:
 	@ echo "Info: Covid-19 Simulator"
