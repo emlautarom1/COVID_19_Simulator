@@ -99,7 +99,7 @@ bool is_sick(Cell target)
 
 int susceptibility(Cell target)
 {
-    int by_age;
+    int by_age = 0;
     switch (target.age)
     {
     case CHILD:
@@ -170,7 +170,7 @@ void contagious_to_isolated_rule(Cell *target, int time)
 
 void live_or_die_rule(Cell *target)
 {
-    double by_age;
+    double by_age = 0;
     switch (target->age)
     {
     case CHILD:
