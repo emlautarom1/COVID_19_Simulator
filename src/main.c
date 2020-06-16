@@ -11,29 +11,40 @@
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
-#define WIN_W 640
-#define WIN_H 640
-#define CELL_SIZE 20
+#define DEBUG true
+
+#if defined(DEBUG) && DEBUG
+#define DEBUG_PRINT(fmt, args...) printf("[DBG]: %s:%d:%s(): " fmt, \
+                                         __FILE__, __LINE__, __func__, ##args)
+#else
+#define DEBUG_PRINT(fmt, args...)
+#endif
+
+#define WIN_W 600
+#define WIN_H 600
+#define CELL_SIZE 10
+
+#define MAX_SPEED 30
 
 #define DISSEASE_STRENGTH 2.4
 
 typedef enum Gender
 {
-    MALE,
-    FEMALE
+    MALE = 0,
+    FEMALE = 1
 } Gender;
 
 typedef enum Age
 {
-    CHILD,
-    ADULT,
-    ELDER
+    CHILD = 0,
+    ADULT = 1,
+    ELDER = 2
 } Age;
 
 typedef enum CellStatus
 {
     EMPTY_WHITE = 0xFFFFFF,
-    susceptible_BLUE = 0x0000FF,
+    SUSC_BLUE = 0x0000FF,
     SICK_NC_ORANGE = 0xFFAA00,
     SICK_C_RED = 0xFF0000,
     ISOLATED_YELLOW = 0xFFFF00,
@@ -103,9 +114,9 @@ int susceptibility(Cell target)
     default:
         break;
     }
-    int by_risk = target.risk_disease || target.risk_job;
+    int by_risk = (target.risk_disease || target.risk_job) ? 15 : 0;
 
-    return (by_age + by_risk) / 100;
+    return by_age + by_risk;
 }
 
 int infected_neighbors(Cell *neighbors)
@@ -123,9 +134,14 @@ int infected_neighbors(Cell *neighbors)
 void susceptible_to_sick_rule(Cell *target, Cell *neighbors, int time)
 {
     assert(neighbors != NULL);
-    double perc_infected_neighbors = infected_neighbors(neighbors) / 8;
-    double perc_susceptibility = susceptibility(*target);
-    double get_sick_chance = (perc_infected_neighbors * DISSEASE_STRENGTH) + perc_susceptibility;
+    int inf_n = infected_neighbors(neighbors);
+    if (inf_n == 0)
+    {
+        // Can't get sick if there are no infected neighbors
+        return;
+    }
+    int susc = susceptibility(*target);
+    double get_sick_chance = ((inf_n / 8) * DISSEASE_STRENGTH) + (susc / 100);
 
     if (((rand() % 100) / 100) < get_sick_chance)
     {
@@ -179,39 +195,43 @@ void live_or_die_rule(Cell *target)
         target->status = CURED_GREEN;
 }
 
-void update_cell_status(Cell *target, int time)
+void new_random_alive_cell(Cell *c)
 {
-    assert(target != NULL);
-    assert(time > 0);
+    Age age;
+    int r = rand() % 100;
+    if (r < 30)
+        age = CHILD;
+    else if (r >= 30 && r < 84)
+        age = ADULT;
+    else
+        age = ELDER;
 
-    if (target->status == susceptible_BLUE)
-        susceptible_to_sick_rule(target, /*TODO: Neighbors */ NULL, time);
+    CellStatus initial_s = rand() % 1000 < 2 ? SICK_NC_ORANGE : SUSC_BLUE;
 
-    if (target->status == SICK_NC_ORANGE)
-        sick_to_contagious_rule(target, time);
-
-    if (target->status == SICK_C_RED)
-        contagious_to_isolated_rule(target, time);
-
-    if (is_sick(*target) && (time - target->contagion_t) == 14)
-        live_or_die_rule(target);
+    c->age = age,
+    c->risk_disease = (rand() % 100 < 10),
+    c->risk_job = (rand() % 100 < 10),
+    c->vaccinated = (rand() % 100 < 70),
+    c->gender = rand() % 2,
+    c->status = initial_s,
+    c->contagion_t = 0;
 }
 
-Cell *make_cell_matrix(int w, int h)
+void init_cell_matrix(Cell *matrix, int w, int h)
 {
-    Cell *matrix = malloc((size_t)w * (size_t)h * sizeof(Cell));
-
-    Cell empty_cell = {.status = DEAD_BLACK};
     for (int i = 0; i < h; i++)
     {
         for (int j = 0; j < w; j++)
         {
             int pos = i * w + j;
-            matrix[pos] = empty_cell;
+            if (rand() % 100 < 50)
+                matrix[pos].status = EMPTY_WHITE;
+            else
+            {
+                new_random_alive_cell(&matrix[pos]);
+            }
         }
     }
-
-    return matrix;
 }
 
 int main(void)
@@ -245,16 +265,24 @@ int main(void)
     // Init random number generation
     srand((unsigned int)time(NULL));
 
-    int cell_cols = WIN_W / CELL_SIZE;
-    int cell_rows = WIN_H / CELL_SIZE;
-    Cell *cell_matrix = make_cell_matrix(cell_cols, cell_rows);
+    int cols = WIN_W / CELL_SIZE;
+    int rows = WIN_H / CELL_SIZE;
 
-    SDL_Rect rect = {.x = 0, .y = 0, .w = CELL_SIZE, .h = CELL_SIZE};
+    Cell *matrix = malloc((size_t)(cols * rows) * sizeof(Cell));
+    Cell *upd_matrix = malloc((size_t)(cols * rows) * sizeof(Cell));
+    Cell *buff_neighbors = malloc(8 * sizeof(Cell));
+
+    init_cell_matrix(matrix, cols, rows);
+
+    int sim_t = 0;
+    Uint32 sim_speed = 10;
+
+    SDL_Rect rect = {.w = CELL_SIZE, .h = CELL_SIZE};
     int should_exit = 0;
-    int simulation_speed = 10;
     int paused = 0;
     while (!should_exit)
     {
+        // Handle events
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
@@ -267,9 +295,14 @@ int main(void)
                 if (event.key.keysym.scancode == SDL_SCANCODE_SPACE)
                     paused = !paused;
                 if (event.key.keysym.scancode == SDL_SCANCODE_RIGHTBRACKET)
-                    simulation_speed += 5;
+                    sim_speed = MIN(MAX_SPEED, sim_speed + 1);
                 if (event.key.keysym.scancode == SDL_SCANCODE_LEFTBRACKET)
-                    simulation_speed = MAX(simulation_speed - 5, 0);
+                    sim_speed = MAX(sim_speed - 1, 1);
+                if (event.key.keysym.scancode == SDL_SCANCODE_R)
+                {
+                    init_cell_matrix(matrix, cols, rows);
+                    sim_t = 0;
+                }
             default:
                 break;
             }
@@ -277,32 +310,66 @@ int main(void)
         if (paused)
             continue;
 
+        // Rendering
         SDL_RenderClear(rend);
-        for (int i = 0; i < cell_rows; i++)
+        for (int i = 0; i < rows; i++)
         {
-            for (int j = 0; j < cell_cols; j++)
+            for (int j = 0; j < cols; j++)
             {
-                CellStatus status = cell_matrix[i * cell_cols + j].status;
+                CellStatus current_status = matrix[i * cols + j].status;
                 rect.x = j * CELL_SIZE;
                 rect.y = i * CELL_SIZE;
 
                 SDL_SetRenderDrawColor(rend,
-                                       (status >> 16) & 0xFF,
-                                       (status >> 8) & 0xFF,
-                                       status & 0xFF,
+                                       (current_status >> 16) & 0xFF,
+                                       (current_status >> 8) & 0xFF,
+                                       current_status & 0xFF,
                                        255);
                 SDL_RenderFillRect(rend, &rect);
             }
         }
-
-        // Show to screen
         SDL_RenderPresent(rend);
 
-        SDL_Delay(1000 / 60);
+        // Update
+        memcpy(upd_matrix, matrix, (size_t)(cols * rows) * sizeof(Cell));
+        for (int i = 0; i < rows; i++)
+        {
+            for (int j = 0; j < cols; j++)
+            {
+                Cell *current = &upd_matrix[i * cols + j];
+                if (current->status == SUSC_BLUE)
+                {
+                    neighbors(matrix, cols, rows, j, i, buff_neighbors);
+                    susceptible_to_sick_rule(current, buff_neighbors, sim_t);
+                }
+                if (current->status == SICK_NC_ORANGE)
+                {
+                    sick_to_contagious_rule(current, sim_t);
+                }
+                if (current->status == SICK_C_RED)
+                {
+                    contagious_to_isolated_rule(current, sim_t);
+                }
+                if (is_sick(*current) && (sim_t - current->contagion_t) == 14)
+                {
+                    live_or_die_rule(current);
+                }
+            }
+        }
+
+        void *temp = matrix;
+        matrix = upd_matrix;
+        upd_matrix = temp;
+
+        sim_t++;
+        DEBUG_PRINT("\n\tTime: %d\n\tSpeed: %d\n", sim_t, sim_speed);
+        SDL_Delay(1000 / sim_speed);
     }
 
     // Cleanup
-    free(cell_matrix);
+    free(buff_neighbors);
+    free(matrix);
+    free(upd_matrix);
     SDL_DestroyRenderer(rend);
     SDL_DestroyWindow(window);
     SDL_Quit();
