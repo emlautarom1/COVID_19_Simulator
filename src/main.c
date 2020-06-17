@@ -310,6 +310,8 @@ int main(void)
                     init_cell_matrix(matrix, cols, rows);
                     sim_t = 0;
                 }
+                if (event.key.keysym.scancode == SDL_SCANCODE_Q)
+                    should_exit = true;
             default:
                 break;
             }
