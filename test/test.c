@@ -31,6 +31,18 @@ void print_person(Person p)
     printf("District: %d\n\n", p.district);
 }
 
+void print_int_array(int *a, int size)
+{
+    printf("[");
+    if (size > 0)
+        printf("%d", a[0]);
+    for (int i = 1; i < size; i++)
+    {
+        printf(",%d", a[i]);
+    }
+    printf("]\n");
+}
+
 void custom_data_types(int nprocs, int rank)
 {
     MPI_Datatype MPI_MY_PERSON;
@@ -67,6 +79,47 @@ void custom_data_types(int nprocs, int rank)
     }
 }
 
+void circular_rows(void)
+{
+    /*
+        Given a matrix M (m x n) - m rows, n columns
+        Given NP, number of available procs
+        * Assume 
+            m % NP == 0
+            m >= NP
+        
+        -> Each proc will handle (m / NP) + 2 rows in a circular fashion
+        
+        Ex:
+            NP             = 3
+            (m, n)         = (6, 6)
+            Rows per proc = (6 / 3) + 2 = 2 + 2 = 4
+            
+            Proc[0] = [5 0 1 2]
+            Proc[1] = [1 2 3 4]
+            Proc[2] = [3 4 5 0]
+    */
+    int rows = 6;
+    int nprocs = 6;
+    int padding = 2;
+    int rows_per_proc = (rows / nprocs) + padding;
+
+    int *actual[nprocs];
+    for (int i = 0; i < nprocs; i++)
+    {
+        actual[i] = malloc((size_t)rows_per_proc * sizeof(int));
+        for (int j = 0; j < rows_per_proc; j++)
+        {
+            actual[i][j] = (i * (rows_per_proc - padding) + j - 1 + rows) % rows;
+        }
+    }
+    for (int i = 0; i < nprocs; i++)
+    {
+        printf("Proc[%d]: ", i);
+        print_int_array(actual[i], rows_per_proc);
+    }
+}
+
 int main(void)
 {
     int nprocs, rank;
@@ -78,6 +131,8 @@ int main(void)
         printf("[DBG] Running tests with %d procs...\n\n", nprocs);
 
     custom_data_types(nprocs, rank);
+    if (rank == 0)
+        circular_rows();
 
     MPI_Finalize();
     return 0;
