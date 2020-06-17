@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
-#include <assert.h>
-#include <math.h>
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_timer.h>
