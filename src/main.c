@@ -70,7 +70,7 @@ typedef struct Cell
     int contagion_t;
 } Cell;
 
-void neighbors(Cell *matrix, int matrix_w, int matrix_h, int cell_x, int cell_y, Cell *out_buffer)
+void neighbors(Cell *matrix, int matrix_w, int matrix_h, int cell_x, int cell_y, Cell **out_buffer)
 {
     assert(matrix != NULL);
     assert(out_buffer != NULL);
@@ -87,14 +87,14 @@ void neighbors(Cell *matrix, int matrix_w, int matrix_h, int cell_x, int cell_y,
         └───┴───┴───┘  
     */
 
-    out_buffer[0] = matrix[((cell_y - 1 + matrix_h) % matrix_h) * matrix_w + (cell_x - 1 + matrix_w) % matrix_w];
-    out_buffer[1] = matrix[((cell_y - 1 + matrix_h) % matrix_h) * matrix_w + (cell_x - 0 + matrix_w) % matrix_w];
-    out_buffer[2] = matrix[((cell_y - 1 + matrix_h) % matrix_h) * matrix_w + (cell_x + 1 + matrix_w) % matrix_w];
-    out_buffer[3] = matrix[((cell_y - 0 + matrix_h) % matrix_h) * matrix_w + (cell_x - 1 + matrix_w) % matrix_w];
-    out_buffer[4] = matrix[((cell_y + 0 + matrix_h) % matrix_h) * matrix_w + (cell_x + 1 + matrix_w) % matrix_w];
-    out_buffer[5] = matrix[((cell_y + 1 + matrix_h) % matrix_h) * matrix_w + (cell_x - 1 + matrix_w) % matrix_w];
-    out_buffer[6] = matrix[((cell_y + 1 + matrix_h) % matrix_h) * matrix_w + (cell_x + 0 + matrix_w) % matrix_w];
-    out_buffer[7] = matrix[((cell_y + 1 + matrix_h) % matrix_h) * matrix_w + (cell_x + 1 + matrix_w) % matrix_w];
+    out_buffer[0] = &matrix[((cell_y - 1 + matrix_h) % matrix_h) * matrix_w + (cell_x - 1 + matrix_w) % matrix_w];
+    out_buffer[1] = &matrix[((cell_y - 1 + matrix_h) % matrix_h) * matrix_w + (cell_x - 0 + matrix_w) % matrix_w];
+    out_buffer[2] = &matrix[((cell_y - 1 + matrix_h) % matrix_h) * matrix_w + (cell_x + 1 + matrix_w) % matrix_w];
+    out_buffer[3] = &matrix[((cell_y - 0 + matrix_h) % matrix_h) * matrix_w + (cell_x - 1 + matrix_w) % matrix_w];
+    out_buffer[4] = &matrix[((cell_y + 0 + matrix_h) % matrix_h) * matrix_w + (cell_x + 1 + matrix_w) % matrix_w];
+    out_buffer[5] = &matrix[((cell_y + 1 + matrix_h) % matrix_h) * matrix_w + (cell_x - 1 + matrix_w) % matrix_w];
+    out_buffer[6] = &matrix[((cell_y + 1 + matrix_h) % matrix_h) * matrix_w + (cell_x + 0 + matrix_w) % matrix_w];
+    out_buffer[7] = &matrix[((cell_y + 1 + matrix_h) % matrix_h) * matrix_w + (cell_x + 1 + matrix_w) % matrix_w];
 }
 
 bool is_sick(Cell target)
@@ -126,19 +126,19 @@ int susceptibility(Cell target)
     return by_age + by_risk;
 }
 
-int infected_neighbors(Cell *neighbors)
+int infected_neighbors(Cell **neighbors)
 {
     assert(neighbors != NULL);
     int infected_count = 0;
     for (int i = 0; i < 8; i++)
     {
-        if (neighbors[i].status == SICK_C_RED)
+        if (neighbors[i]->status == SICK_C_RED)
             infected_count += 1;
     }
     return infected_count;
 }
 
-void susceptible_to_sick_rule(Cell *target, Cell *neighbors, int time)
+void susceptible_to_sick_rule(Cell *target, Cell **neighbors, int time)
 {
     assert(neighbors != NULL);
     int inf_n = infected_neighbors(neighbors);
@@ -277,7 +277,7 @@ int main(void)
 
     Cell *matrix = malloc((size_t)(cols * rows) * sizeof(Cell));
     Cell *upd_matrix = malloc((size_t)(cols * rows) * sizeof(Cell));
-    Cell *buff_neighbors = malloc(8 * sizeof(Cell));
+    Cell **buff_neighbors = malloc(8 * sizeof(Cell));
 
     init_cell_matrix(matrix, cols, rows);
 
