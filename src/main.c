@@ -20,6 +20,13 @@
 #define DEBUG_PRINT(fmt, args...)
 #endif
 
+unsigned int const __rand_seed__ =
+#if defined(DEBUG) && DEBUG
+    31415926;
+#else
+    (unsigned int)time(NULL);
+#endif
+
 #define WIN_W 600
 #define WIN_H 600
 #define CELL_SIZE 10
@@ -263,7 +270,7 @@ int main(void)
     }
 
     // Init random number generation
-    srand((unsigned int)time(NULL));
+    srand(__rand_seed__);
 
     int cols = WIN_W / CELL_SIZE;
     int rows = WIN_H / CELL_SIZE;
