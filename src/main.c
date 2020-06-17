@@ -362,7 +362,9 @@ int main(void)
         upd_matrix = temp;
 
         sim_t++;
+        // Debugging
         DEBUG_PRINT("\n\tTime: %d\n\tSpeed: %d\n", sim_t, sim_speed);
+
         SDL_Delay(1000 / sim_speed);
     }
 
