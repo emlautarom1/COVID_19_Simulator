@@ -12,6 +12,12 @@ build: src/main.c
 run: build/main
 	./build/main
 
+bench: src/main.c
+	$(CC) src/main.c -o build/main -pg $(CFLAGS)
+	make run
+	@gprof build/main gmon.out > benchmark/$$(date +'%F_%k-%M')_bench.txt
+	rm gmon.out
+
 .PHONY: clean
 clean:
 	@ -rm -f build/*
