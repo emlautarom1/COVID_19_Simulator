@@ -18,6 +18,10 @@ bench: src/main.c
 	@gprof build/main gmon.out > benchmark/$$(date +'%F_%k-%M')_bench.txt
 	rm gmon.out
 
+test: test/test.c
+	$(CC) test/test.c -o build/test $(CFLAGS)
+	mpirun build/test
+
 .PHONY: clean
 clean:
 	@ -rm -f build/*
