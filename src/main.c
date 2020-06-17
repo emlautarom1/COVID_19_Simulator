@@ -277,7 +277,7 @@ int main(void)
 
     Cell *matrix = malloc((size_t)(cols * rows) * sizeof(Cell));
     Cell *upd_matrix = malloc((size_t)(cols * rows) * sizeof(Cell));
-    Cell **buff_neighbors = malloc(8 * sizeof(Cell));
+    Cell *buff_neighbors[8];
 
     init_cell_matrix(matrix, cols, rows);
 
@@ -378,7 +378,6 @@ int main(void)
     }
 
     // Cleanup
-    free(buff_neighbors);
     free(matrix);
     free(upd_matrix);
     SDL_DestroyRenderer(rend);
