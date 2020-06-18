@@ -106,6 +106,12 @@ void custom_data_types(int nprocs, int rank)
     }
 }
 
+void busy_waiting(int n)
+{
+    for (int i = 0; i < n * 9999999; i += 2)
+        i--;
+}
+
 void init_int_matrix(int *m, int w, int h)
 {
     for (int i = 0; i < h; i++)
@@ -235,12 +241,12 @@ void sending_frontiers(int nprocs, int rank)
         MPI_COMM_WORLD);
 
     // Delay printing
-    for (int i = 0; i < rank * 999999; i++)
-    {
-    }
+    busy_waiting(rank);
 
     // Work on my_rows
     fill_int_matrix_with(&my_rows[cols], cols, rows_per_proc - padding, rank);
+
+    busy_waiting(rank);
 
     printf("Rank %d matrix:\n", rank);
     print_int_matrix(my_rows, cols, rows_per_proc);
@@ -264,6 +270,7 @@ void sending_frontiers(int nprocs, int rank)
         // First to last
         memcpy(&upd_matrix[(rows + 1) * cols], &upd_matrix[cols], (size_t)cols * sizeof(int));
 
+        busy_waiting(nprocs);
         printf("Updated Matrix:\n");
         print_int_matrix(upd_matrix, cols, rows + padding);
     }
