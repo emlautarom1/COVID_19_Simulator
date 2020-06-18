@@ -44,8 +44,8 @@ void neighbors(Cell *matrix, int matrix_w, int matrix_h, int cell_x, int cell_y,
 {
     assert(matrix != NULL);
     assert(out_buffer != NULL);
-    assert(cell_x >= 0 && cell_x < matrix_w);
-    assert(cell_y >= 0 && cell_y < matrix_h);
+    assert(cell_x >= 0);
+    assert(cell_y >= 0);
 
     /*
         C is the current Cell given in (x,y)
