@@ -12,6 +12,7 @@
 #define CELL_SIZE 10
 
 #define MAX_SPEED 30
+#define SIM_LIMIT 120
 
 #include "utils.h"
 #include "simulation.h"
@@ -67,13 +68,8 @@ int main(int argc, char const *argv[])
 
     init_cell_matrix(matrix, cols, rows);
 
-    int sim_t = 0;
     Uint32 sim_speed = 10;
-
-    SDL_Rect rect = {.w = CELL_SIZE, .h = CELL_SIZE};
-    int should_exit = 0;
-    int paused = 0;
-    while (!should_exit)
+    for (int sim_t = 0; sim_t < SIM_LIMIT; sim_t++)
     {
         // Handle events
         SDL_Event event;
@@ -82,30 +78,22 @@ int main(int argc, char const *argv[])
             switch (event.type)
             {
             case SDL_QUIT:
-                should_exit = 1;
+                sim_t = SIM_LIMIT;
                 break;
             case SDL_KEYDOWN:
-                if (event.key.keysym.scancode == SDL_SCANCODE_SPACE)
-                    paused = !paused;
                 if (event.key.keysym.scancode == SDL_SCANCODE_RIGHTBRACKET)
                     sim_speed = MIN(MAX_SPEED, sim_speed + 1);
                 if (event.key.keysym.scancode == SDL_SCANCODE_LEFTBRACKET)
                     sim_speed = MAX(sim_speed - 1, 1);
-                if (event.key.keysym.scancode == SDL_SCANCODE_R)
-                {
-                    init_cell_matrix(matrix, cols, rows);
-                    sim_t = 0;
-                }
                 if (event.key.keysym.scancode == SDL_SCANCODE_Q)
-                    should_exit = true;
+                    sim_t = SIM_LIMIT;
             default:
                 break;
             }
         }
-        if (paused)
-            continue;
 
         // Rendering
+        SDL_Rect rect = {.w = CELL_SIZE, .h = CELL_SIZE};
         SDL_RenderClear(rend);
         for (int i = 0; i < rows; i++)
         {
@@ -156,12 +144,13 @@ int main(int argc, char const *argv[])
         matrix = upd_matrix;
         upd_matrix = temp;
 
-        sim_t++;
         // Debugging
         DEBUG_PRINT("\n\tTime: %d\n\tSpeed: %d\n", sim_t, sim_speed);
 
         SDL_Delay(1000 / sim_speed);
     }
+
+    DEBUG_PRINT("Simulation finished!\n");
 
     // Cleanup
     free(matrix);
