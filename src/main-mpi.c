@@ -30,23 +30,30 @@ int main(int argc, char const *argv[])
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    if (argc < 3)
+    if (rank == MASTER_RANK)
     {
-        fprintf(stderr, "Usage: %s <rows> <cols>", argv[0]);
-        MPI_Abort(MPI_COMM_WORLD, -1);
+        if (argc < 3)
+        {
+            fprintf(stderr, "Usage: %s <rows> <cols>\n", argv[0]);
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
     }
+
     int rows = atoi(argv[1]);
     int cols = atoi(argv[2]);
 
-    if (rows < 2 || cols < 2)
+    if (rank == MASTER_RANK)
     {
-        fprintf(stderr, "[ERR] At least 2 rows and cols, got %d and %d", rows, cols);
-        MPI_Abort(MPI_COMM_WORLD, -1);
-    }
-    if (rows % nprocs != 0)
-    {
-        fprintf(stderr, "[ERR] rows (%d) %% nprocs (%d) != 0", rows, nprocs);
-        MPI_Abort(MPI_COMM_WORLD, -1);
+        if (rows < 2 || cols < 2)
+        {
+            fprintf(stderr, "[ERR] At least 2 rows and cols, got %d and %d\n", rows, cols);
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+        if (rows % nprocs != 0)
+        {
+            fprintf(stderr, "[ERR] rows (%d) %% nprocs (%d) != 0\n", rows, nprocs);
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
     }
 
     // SDL Setup
