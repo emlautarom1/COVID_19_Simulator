@@ -1,6 +1,6 @@
 WARNS=-Wextra -Wall -Wundef  -Wfloat-equal -Wshadow -Wpointer-arith -Wcast-align -Wstrict-prototypes -Wstrict-overflow=5 -Wwrite-strings -Waggregate-return -Wcast-qual -Wswitch-default -Wswitch-enum -Wconversion -Wunreachable-code
 # OMP_NUM_THREADS=12
-NP=3
+NP=6
 ROWS=60
 COLS=60
 CFLAGS=$(WARNS) --std=c99 -O0 -lSDL2 # -fopenmp
