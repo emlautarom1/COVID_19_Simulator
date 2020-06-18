@@ -25,6 +25,13 @@
 
 int main(int argc, char const *argv[])
 {
+    unsigned int MY_RANDOM_SEED =
+#if defined(DEBUG) && DEBUG
+        31415926;
+#else
+        (unsigned int)time(NULL);
+#endif
+
     int nprocs, rank;
     MPI_Init(NULL, NULL);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
@@ -84,7 +91,7 @@ int main(int argc, char const *argv[])
     }
 
     // Init random number generation
-    srand(__rand_seed__);
+    srand(MY_RANDOM_SEED);
 
     int rows_per_proc = (rows / nprocs) + R_PADDING;
     Cell *my_matrix = malloc((size_t)(rows_per_proc * cols) * sizeof(Cell));
