@@ -106,6 +106,127 @@ void custom_data_types(int nprocs, int rank)
     }
 }
 
+void sending_frontiers(int nprocs, int rank)
+{
+    /*
+        Given a Matrix M (m x n)
+        Given NP, number of available procs
+        * Assume 
+            m % NP == 0
+            m >= NP
+        
+        -> Each proc will handle (m / NP) + 2 rows in a circular fashion
+
+        Example:
+            3 rows, 3 cols, 3 procs
+    
+                * Replicate the last row at the start and the first one at the end
+                * for easier distribution
+    
+            Row IDX
+                    ┌───┬───┬───┐
+               0    │ 6 │ 7 │ 8 │ <- row 3
+               1    │ 0 │ 1 │ 2 │ <┐
+               2    │ 3 │ 4 │ 5 │  │ 3 rows 
+               3    │ 6 │ 7 │ 8 │ <┘
+               4    │ 0 │ 1 │ 2 │ <- row 1
+                    └───┴───┴───┘
+            
+            (3 / 3) + 2 rows = 3 rows/proc
+            
+            Rows indices/proc:
+                - Proc[0] = [0,1,2] = [[6,7,8], [0,1,2], [3,4,5]]
+                - Proc[1] = [1,2,3] = [[0,1,2], [3,4,5], [6,7,8]]
+                - Proc[3] = [2,3,4] = [[3,4,5], [6,7,8], [0,1,2]]
+        
+        Example 2:
+            6 rows, 6 cols, 3 procs
+            
+            (6 / 3) + 2 rows = 4 rows/proc
+            Rows indices/proc:
+                - Proc[0] = [0,1,2,3]
+                - Proc[1] = [2,3,4,5]
+                - Proc[3] = [4,5,6,7]
+    */
+    int rows = 6;
+    int cols = 6;
+    int padding = 2;
+
+    if (rows % nprocs != 0)
+    {
+        if (rank == 0)
+            printf("[DBG] Invalid number of procs: %d", nprocs);
+        return;
+    }
+    int rows_per_proc = (rows / nprocs) + padding;
+    int *my_rows = malloc((size_t)(rows_per_proc * cols) * sizeof(int));
+
+    int *matrix;
+    int sendcounts[nprocs];
+    int displacements[nprocs];
+
+    if (rank == 0)
+    {
+        printf("Rows/proc: %d\n", rows_per_proc);
+
+        matrix = malloc((size_t)((rows + padding) * cols) * sizeof(int));
+        // Init the matrix
+        for (int i = 0; i < rows; i++)
+            for (int j = 0; j < cols; j++)
+                matrix[(i + 1) * cols + j] = i * cols + j;
+
+        // Copy the frontiers
+        // Last to first
+        memcpy(matrix, &matrix[rows * cols], (size_t)cols * sizeof(int));
+        // First to last
+        memcpy(&matrix[(rows + 1) * cols], &matrix[cols], (size_t)cols * sizeof(int));
+
+        printf("Matrix:\n");
+        print_int_matrix(matrix, cols, rows + padding);
+
+        // Calculate rows indices per proc (NOT NECCESARY)
+        int *row_indices = malloc((size_t)(nprocs * rows_per_proc) * sizeof(int));
+        for (int i = 0; i < nprocs; i++)
+        {
+            for (int j = 0; j < rows_per_proc; j++)
+                row_indices[i * rows_per_proc + j] = i * (rows_per_proc - padding) + j;
+        }
+        printf("Row indices/proc:\n");
+        print_int_matrix(row_indices, rows_per_proc, nprocs);
+
+        for (int i = 0; i < nprocs; i++)
+        {
+            // All procs work with the same number of rows
+            sendcounts[i] = rows_per_proc * cols;
+            displacements[i] = i * (rows_per_proc - padding) * cols;
+        }
+
+        printf("Displacements: ");
+        print_int_array(displacements, nprocs);
+        printf("\n");
+    }
+
+    // Send to each proc the appropiate rows
+    MPI_Scatterv(
+        matrix,
+        sendcounts,
+        displacements,
+        MPI_INT,
+        my_rows,
+        rows_per_proc * cols,
+        MPI_INT,
+        0,
+        MPI_COMM_WORLD);
+
+    // Delay printing
+    for (int i = 0; i < rank * 999999; i++)
+    {
+    }
+
+    printf("Rank %d matrix:\n", rank);
+    print_int_matrix(my_rows, cols, rows_per_proc);
+}
+
 int main(void)
 {
     int nprocs, rank;
@@ -117,7 +238,7 @@ int main(void)
         printf("[DBG] Running tests with %d procs...\n\n", nprocs);
 
     // custom_data_types(nprocs, rank);
-    // sending_frontiers(nprocs, rank);
+    sending_frontiers(nprocs, rank);
 
     MPI_Finalize();
     return 0;
