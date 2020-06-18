@@ -44,8 +44,6 @@ int main(int argc, char const *argv[])
     // Init random number generation
     srand(__rand_seed__);
 
-    MPI_Datatype MPI_COVID19_CELL;
-
     int rows_per_proc = (rows / nprocs) + R_PADDING;
     Cell *my_matrix = malloc((size_t)(rows_per_proc * cols) * sizeof(Cell));
     Cell *my_upd_matrix = malloc((size_t)(rows_per_proc * cols) * sizeof(Cell));
@@ -56,6 +54,37 @@ int main(int argc, char const *argv[])
     int *sendcounts;
     int *recvcounts;
     int *displacements;
+
+    if (rank == MASTER_RANK)
+        DEBUG_PRINT("Starting MPI_COVID19_CELL type registration\n");
+    MPI_Datatype MPI_COVID19_CELL;
+    int mpi_cell_block_lengths[] = {1, 1, 1, 1, 1, 1, 1};
+    MPI_Aint mpi_cell_displacements[] = {
+        offsetof(Cell, age),
+        offsetof(Cell, risk_disease),
+        offsetof(Cell, risk_job),
+        offsetof(Cell, vaccinated),
+        offsetof(Cell, gender),
+        offsetof(Cell, status),
+        offsetof(Cell, contagion_t)};
+    MPI_Datatype mpi_cell_lengths[] = {
+        MPI_INT,    // age
+        MPI_C_BOOL, // risk_disease
+        MPI_C_BOOL, // risk_job
+        MPI_C_BOOL, // vaccinated
+        MPI_INT,    // gender
+        MPI_INT,    // status
+        MPI_INT     // contagion_t
+    };
+    MPI_Type_create_struct(
+        7, // Number of fields in 'Cell'
+        mpi_cell_block_lengths,
+        mpi_cell_displacements,
+        mpi_cell_lengths,
+        &MPI_COVID19_CELL);
+    MPI_Type_commit(&MPI_COVID19_CELL);
+    if (rank == MASTER_RANK)
+        DEBUG_PRINT("MPI_COVID19_CELL type registered\n");
 
     if (rank == MASTER_RANK)
     {
@@ -82,37 +111,6 @@ int main(int argc, char const *argv[])
             recvcounts[i] = (rows_per_proc - R_PADDING) * cols;
             displacements[i] = i * (rows_per_proc - R_PADDING) * cols;
         }
-
-        DEBUG_PRINT("Displacements: \n");
-        for (int i = 0; i < nprocs; i++)
-            printf("%d ", displacements[i]);
-        printf("\n");
-
-        int mpi_cell_block_lengths[] = {1, 1, 1, 1, 1, 1, 1};
-        MPI_Aint mpi_cell_displacements[] = {
-            offsetof(Cell, age),
-            offsetof(Cell, risk_disease),
-            offsetof(Cell, risk_job),
-            offsetof(Cell, vaccinated),
-            offsetof(Cell, gender),
-            offsetof(Cell, status),
-            offsetof(Cell, contagion_t)};
-        MPI_Datatype mpi_cell_lengths[] = {
-            MPI_INT,    // age
-            MPI_C_BOOL, // risk_disease
-            MPI_C_BOOL, // risk_job
-            MPI_C_BOOL, // vaccinated
-            MPI_INT,    // gender
-            MPI_INT,    // status
-            MPI_INT     // contagion_t
-        };
-        MPI_Type_create_struct(
-            7, // Number of fields in 'Cell'
-            mpi_cell_block_lengths,
-            mpi_cell_displacements,
-            mpi_cell_lengths,
-            &MPI_COVID19_CELL);
-        MPI_Type_commit(&MPI_COVID19_CELL);
 
         DEBUG_PRINT("Master rank setup dance complete\n");
     }
