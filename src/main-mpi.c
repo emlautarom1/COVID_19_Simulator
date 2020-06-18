@@ -16,6 +16,7 @@
 
 #define MASTER_RANK 0
 
+#define MAX_SPEED 30
 #define SIM_LIMIT 120
 #define R_PADDING 2
 
@@ -149,11 +150,34 @@ int main(int argc, char const *argv[])
         DEBUG_PRINT("Master rank setup dance complete\n");
     }
 
+    // Only usefull for MASTER_RANK
+    Uint32 sim_speed = 10;
     for (int sim_t = 0; sim_t < SIM_LIMIT; sim_t++)
     {
         // Rendering on master rank
         if (rank == MASTER_RANK)
         {
+            // Handle events
+            SDL_Event event;
+            while (SDL_PollEvent(&event))
+            {
+                switch (event.type)
+                {
+                case SDL_QUIT:
+                    sim_t = SIM_LIMIT;
+                    break;
+                case SDL_KEYDOWN:
+                    if (event.key.keysym.scancode == SDL_SCANCODE_RIGHTBRACKET)
+                        sim_speed = MIN(MAX_SPEED, sim_speed + 1);
+                    if (event.key.keysym.scancode == SDL_SCANCODE_LEFTBRACKET)
+                        sim_speed = MAX(sim_speed - 1, 1);
+                    if (event.key.keysym.scancode == SDL_SCANCODE_Q)
+                        sim_t = SIM_LIMIT;
+                default:
+                    break;
+                }
+            }
+
             SDL_Rect rect = {.w = CELL_SIZE, .h = CELL_SIZE};
             SDL_RenderClear(rend);
             for (int i = 0; i < rows; i++)
@@ -236,7 +260,14 @@ int main(int argc, char const *argv[])
             void *temp = matrix;
             matrix = upd_matrix;
             upd_matrix = temp;
+
+            SDL_Delay(1000 / sim_speed);
+
+            // Debugging
+            DEBUG_PRINT("\n\tTime: %d\n\tSpeed: %d\n", sim_t, sim_speed);
         }
+
+        MPI_Bcast(&sim_t, 1, MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
     }
     if (rank == MASTER_RANK)
         DEBUG_PRINT("Simulation finished!\n");
