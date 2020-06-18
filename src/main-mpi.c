@@ -115,68 +115,70 @@ int main(int argc, char const *argv[])
         DEBUG_PRINT("Master rank setup dance complete\n");
     }
 
-    // Send to each proc the appropiate rows
-    MPI_Scatterv(
-        matrix,
-        sendcounts,
-        displacements,
-        MPI_COVID19_CELL,
-        my_matrix,
-        rows_per_proc * cols,
-        MPI_COVID19_CELL,
-        0,
-        MPI_COMM_WORLD);
-
-    // Per proc processing
-    memcpy(my_upd_matrix, my_matrix, (size_t)(rows_per_proc * cols) * sizeof(Cell));
-    int sim_t = 0;
-    for (int i = 0; i < rows_per_proc - R_PADDING; i++)
+    for (int sim_t = 0; sim_t < 120; sim_t++)
     {
-        for (int j = 0; j < cols; j++)
+        // Send to each proc the appropiate rows
+        MPI_Scatterv(
+            matrix,
+            sendcounts,
+            displacements,
+            MPI_COVID19_CELL,
+            my_matrix,
+            rows_per_proc * cols,
+            MPI_COVID19_CELL,
+            0,
+            MPI_COMM_WORLD);
+
+        // Per proc processing
+        memcpy(my_upd_matrix, my_matrix, (size_t)(rows_per_proc * cols) * sizeof(Cell));
+        for (int i = 0; i < rows_per_proc - R_PADDING; i++)
         {
-            Cell *current = &my_upd_matrix[cols + (i * cols) + j];
-            if (current->status == SUSC_BLUE)
+            for (int j = 0; j < cols; j++)
             {
-                neighbors(my_matrix, cols, rows_per_proc, j, i + 1, my_buff_neighbors);
-                susceptible_to_sick_rule(current, my_buff_neighbors, sim_t);
-            }
-            if (current->status == SICK_NC_ORANGE)
-            {
-                sick_to_contagious_rule(current, sim_t);
-            }
-            if (current->status == SICK_C_RED)
-            {
-                contagious_to_isolated_rule(current, sim_t);
-            }
-            if (is_sick(*current) && (sim_t - current->contagion_t) == 14)
-            {
-                live_or_die_rule(current);
+                Cell *current = &my_upd_matrix[cols + (i * cols) + j];
+                if (current->status == SUSC_BLUE)
+                {
+                    neighbors(my_matrix, cols, rows_per_proc, j, i + 1, my_buff_neighbors);
+                    susceptible_to_sick_rule(current, my_buff_neighbors, sim_t);
+                }
+                if (current->status == SICK_NC_ORANGE)
+                {
+                    sick_to_contagious_rule(current, sim_t);
+                }
+                if (current->status == SICK_C_RED)
+                {
+                    contagious_to_isolated_rule(current, sim_t);
+                }
+                if (is_sick(*current) && (sim_t - current->contagion_t) == 14)
+                {
+                    live_or_die_rule(current);
+                }
             }
         }
-    }
 
-    // Gather the updated matrix on the master proc
-    MPI_Gatherv(
-        &my_upd_matrix[cols],
-        (rows_per_proc - R_PADDING) * cols,
-        MPI_COVID19_CELL,
-        &upd_matrix[cols],
-        recvcounts,
-        displacements,
-        MPI_COVID19_CELL,
-        0,
-        MPI_COMM_WORLD);
+        // Gather the updated matrix on the master proc
+        MPI_Gatherv(
+            &my_upd_matrix[cols],
+            (rows_per_proc - R_PADDING) * cols,
+            MPI_COVID19_CELL,
+            &upd_matrix[cols],
+            recvcounts,
+            displacements,
+            MPI_COVID19_CELL,
+            0,
+            MPI_COMM_WORLD);
 
-    // Pointer dance per proc
-    void *my_temp = my_matrix;
-    my_matrix = my_upd_matrix;
-    my_upd_matrix = my_temp;
+        // Pointer dance per proc
+        void *my_temp = my_matrix;
+        my_matrix = my_upd_matrix;
+        my_upd_matrix = my_temp;
 
-    if (rank == MASTER_RANK)
-    {
-        void *temp = matrix;
-        matrix = upd_matrix;
-        upd_matrix = temp;
+        if (rank == MASTER_RANK)
+        {
+            void *temp = matrix;
+            matrix = upd_matrix;
+            upd_matrix = temp;
+        }
     }
 
     // Cleanup
