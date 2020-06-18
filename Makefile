@@ -24,8 +24,8 @@ run-mpi: build/main-mpi
 bench: src/main.c src/simulation.h src/utils.h
 	gcc src/main.c -o build/main -pg $(CFLAGS)
 	./build/main 1500 1500 f
-	@gprof build/main gmon.out > benchmark/$$(date +'%F_%k-%M')_bench.txt
-	rm gmon.out
+	@ gprof build/main gmon.out > benchmark/$$(date +'%F_%k-%M')_bench.txt
+	@ rm gmon.out
 
 test: test/test.c
 	mpicc test/test.c -o build/test $(CFLAGS)
@@ -34,3 +34,4 @@ test: test/test.c
 .PHONY: clean
 clean:
 	@ -rm -f build/*
+	@ -rm -f benchmark/*
