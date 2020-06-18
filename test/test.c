@@ -113,6 +113,13 @@ void init_int_matrix(int *m, int w, int h)
             m[i * w + j] = i * w + j;
 }
 
+void fill_int_matrix_with(int *m, int w, int h, int e)
+{
+    for (int i = 0; i < h; i++)
+        for (int j = 0; j < w; j++)
+            m[i * w + j] = e;
+}
+
 void sending_frontiers(int nprocs, int rank)
 {
     /*
@@ -169,7 +176,9 @@ void sending_frontiers(int nprocs, int rank)
     int *my_rows = malloc((size_t)(rows_per_proc * cols) * sizeof(int));
 
     int *matrix;
+    int *upd_matrix;
     int sendcounts[nprocs];
+    int recvcounts[nprocs];
     int displacements[nprocs];
 
     if (rank == 0)
@@ -178,6 +187,7 @@ void sending_frontiers(int nprocs, int rank)
 
         // Init the matrix
         matrix = malloc((size_t)((rows + padding) * cols) * sizeof(int));
+        upd_matrix = malloc((size_t)((rows + padding) * cols) * sizeof(int));
         init_int_matrix(&matrix[cols], cols, rows);
 
         // Copy the frontiers
@@ -203,6 +213,7 @@ void sending_frontiers(int nprocs, int rank)
         {
             // All procs work with the same number of rows
             sendcounts[i] = rows_per_proc * cols;
+            recvcounts[i] = (rows_per_proc - padding) * cols;
             displacements[i] = i * (rows_per_proc - padding) * cols;
         }
 
@@ -228,8 +239,34 @@ void sending_frontiers(int nprocs, int rank)
     {
     }
 
+    // Work on my_rows
+    fill_int_matrix_with(&my_rows[cols], cols, rows_per_proc - padding, rank);
+
     printf("Rank %d matrix:\n", rank);
     print_int_matrix(my_rows, cols, rows_per_proc);
+
+    MPI_Gatherv(
+        &my_rows[cols],
+        (rows_per_proc - padding) * cols,
+        MPI_INT,
+        &upd_matrix[cols],
+        recvcounts,
+        displacements,
+        MPI_INT,
+        0,
+        MPI_COMM_WORLD);
+
+    if (rank == 0)
+    {
+        // Again, copy the frontiers
+        // Last to first
+        memcpy(upd_matrix, &upd_matrix[rows * cols], (size_t)cols * sizeof(int));
+        // First to last
+        memcpy(&upd_matrix[(rows + 1) * cols], &upd_matrix[cols], (size_t)cols * sizeof(int));
+
+        printf("Updated Matrix:\n");
+        print_int_matrix(upd_matrix, cols, rows + padding);
+    }
 }
 
 int main(void)
