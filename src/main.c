@@ -6,7 +6,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_timer.h>
 
-#define DEBUG false
+#define DEBUG true
 
 #define WIN_W 600
 #define WIN_H 600
