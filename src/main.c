@@ -6,8 +6,6 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_timer.h>
 
-#define DEBUG true
-
 #define WIN_W 600
 #define WIN_H 600
 #define CELL_SIZE 10
@@ -82,7 +80,9 @@ int main(int argc, char const *argv[])
 
     init_cell_matrix(matrix, cols, rows);
 
-    Uint32 sim_speed = 10;
+    Uint32 sim_speed = 0;
+    if (use_gui)
+        sim_speed = 10;
     for (int sim_t = 0; sim_t < SIM_LIMIT; sim_t++)
     {
         if (use_gui)

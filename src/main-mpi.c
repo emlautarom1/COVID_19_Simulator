@@ -8,8 +8,6 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_timer.h>
 
-#define DEBUG true
-
 #define WIN_W 600
 #define WIN_H 600
 #define CELL_SIZE 10
@@ -164,8 +162,9 @@ int main(int argc, char const *argv[])
         DEBUG_PRINT("Master rank setup dance complete\n");
     }
 
-    // Only usefull for MASTER_RANK
-    Uint32 sim_speed = 10;
+    Uint32 sim_speed = 0;
+    if (rank == MASTER_RANK)
+        sim_speed = 10;
     for (int sim_t = 0; sim_t < SIM_LIMIT; sim_t++)
     {
         // Rendering on master rank
