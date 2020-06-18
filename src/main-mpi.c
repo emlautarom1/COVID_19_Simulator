@@ -268,10 +268,10 @@ int main(int argc, char const *argv[])
             matrix = upd_matrix;
             upd_matrix = temp;
 
-            SDL_Delay(1000 / sim_speed);
-
             // Debugging
             DEBUG_PRINT("\n\tTime: %d\n\tSpeed: %d\n", sim_t, sim_speed);
+
+            SDL_Delay(1000 / sim_speed);
         }
 
         MPI_Bcast(&sim_t, 1, MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
