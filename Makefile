@@ -3,13 +3,13 @@ WARNS=-Wextra -Wall -Wundef  -Wfloat-equal -Wshadow -Wpointer-arith -Wcast-align
 NP=3
 ROWS=6
 COLS=6
-CFLAGS=$(WARNS) --std=c99 -O0# -fopenmp
+CFLAGS=$(WARNS) --std=c99 -O0 -lSDL2 # -fopenmp
 
 info:
 	@ echo "Info: Covid-19 Simulator"
 
 build: src/main.c src/main-mpi.c src/simulation.h src/utils.h
-	gcc src/main.c -o build/main $(CFLAGS) -lSDL2 
+	gcc src/main.c -o build/main $(CFLAGS)
 	mpicc src/main-mpi.c -o build/main-mpi $(CFLAGS)
 
 run: build/main

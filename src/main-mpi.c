@@ -5,7 +5,14 @@
 #include <stddef.h>
 #include <mpi.h>
 
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_timer.h>
+
 #define DEBUG true
+
+#define WIN_W 600
+#define WIN_H 600
+#define CELL_SIZE 10
 
 #define MASTER_RANK 0
 
@@ -39,6 +46,33 @@ int main(int argc, char const *argv[])
     {
         fprintf(stderr, "[ERR] rows (%d) %% nprocs (%d) != 0", rows, nprocs);
         MPI_Abort(MPI_COMM_WORLD, -1);
+    }
+
+    // SDL Setup
+    SDL_Window *window;
+    SDL_Renderer *rend;
+    if (rank == MASTER_RANK)
+    {
+        window = SDL_CreateWindow("COVID-19 Simulator",
+                                  SDL_WINDOWPOS_CENTERED,
+                                  SDL_WINDOWPOS_CENTERED,
+                                  WIN_W, WIN_H, 0);
+        if (!window)
+        {
+            printf("Error creating main window: %s\n", SDL_GetError());
+            SDL_Quit();
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+
+        rend = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+
+        if (!rend)
+        {
+            printf("Error creating renderer: %s\n", SDL_GetError());
+            SDL_DestroyWindow(window);
+            SDL_Quit();
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
     }
 
     // Init random number generation
@@ -115,8 +149,32 @@ int main(int argc, char const *argv[])
         DEBUG_PRINT("Master rank setup dance complete\n");
     }
 
-    for (int sim_t = 0; sim_t < 120; sim_t++)
+    for (int sim_t = 0; sim_t < SIM_LIMIT; sim_t++)
     {
+        // Rendering on master rank
+        if (rank == MASTER_RANK)
+        {
+            SDL_Rect rect = {.w = CELL_SIZE, .h = CELL_SIZE};
+            SDL_RenderClear(rend);
+            for (int i = 0; i < rows; i++)
+            {
+                for (int j = 0; j < cols; j++)
+                {
+                    CellStatus current_status = matrix[cols + (i * cols) + j].status;
+                    rect.x = j * CELL_SIZE;
+                    rect.y = i * CELL_SIZE;
+
+                    SDL_SetRenderDrawColor(rend,
+                                           (current_status >> 16) & 0xFF,
+                                           (current_status >> 8) & 0xFF,
+                                           current_status & 0xFF,
+                                           255);
+                    SDL_RenderFillRect(rend, &rect);
+                }
+            }
+            SDL_RenderPresent(rend);
+        }
+
         // Send to each proc the appropiate rows
         MPI_Scatterv(
             matrix,
@@ -180,6 +238,8 @@ int main(int argc, char const *argv[])
             upd_matrix = temp;
         }
     }
+    if (rank == MASTER_RANK)
+        DEBUG_PRINT("Simulation finished!\n");
 
     // Cleanup
     if (rank == MASTER_RANK)
@@ -193,6 +253,8 @@ int main(int argc, char const *argv[])
     free(my_matrix);
     free(my_upd_matrix);
 
+    if (rank == MASTER_RANK)
+        SDL_Quit();
     MPI_Finalize();
     return 0;
 }
