@@ -238,9 +238,9 @@ void sending_frontiers(int nprocs, int rank)
 
     int *matrix;
     int *upd_matrix;
-    int sendcounts[nprocs];
-    int recvcounts[nprocs];
-    int displacements[nprocs];
+    int *sendcounts;
+    int *recvcounts;
+    int *displacements;
 
     if (rank == 0)
     {
@@ -270,6 +270,9 @@ void sending_frontiers(int nprocs, int rank)
         printf("Row indices/proc:\n");
         print_int_matrix(row_indices, rows_per_proc, nprocs);
 
+        sendcounts = malloc((size_t)nprocs * sizeof(int));
+        recvcounts = malloc((size_t)nprocs * sizeof(int));
+        displacements = malloc((size_t)nprocs * sizeof(int));
         for (int i = 0; i < nprocs; i++)
         {
             // All procs work with the same number of rows
@@ -342,9 +345,9 @@ int main(void)
         printf("[DBG] Running tests with %d procs...\n\n", nprocs);
 
     // custom_data_types(nprocs, rank);
-    // sending_frontiers(nprocs, rank);
-    if (rank == 0)
-        padded_neighbors();
+    sending_frontiers(nprocs, rank);
+    // if (rank == 0)
+    //     padded_neighbors();
 
     MPI_Finalize();
     return 0;
