@@ -16,8 +16,22 @@
 #include "utils.h"
 #include "simulation.h"
 
-int main(void)
+int main(int argc, char const *argv[])
 {
+    if (argc < 3)
+    {
+        fprintf(stderr, "Usage: %s <rows> <cols>", argv[0]);
+        return -1;
+    }
+    int rows = atoi(argv[1]);
+    int cols = atoi(argv[2]);
+
+    if (rows < 2 || cols < 2)
+    {
+        fprintf(stderr, "[ERR] At least 2 rows and cols, got %d and %d", rows, cols);
+        return -1;
+    }
+
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0)
     {
         printf("Error initializing SDL: %s\n", SDL_GetError());
@@ -46,9 +60,6 @@ int main(void)
 
     // Init random number generation
     srand(__rand_seed__);
-
-    int cols = WIN_W / CELL_SIZE;
-    int rows = WIN_H / CELL_SIZE;
 
     Cell *matrix = malloc((size_t)(cols * rows) * sizeof(Cell));
     Cell *upd_matrix = malloc((size_t)(cols * rows) * sizeof(Cell));
