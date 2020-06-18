@@ -1,6 +1,7 @@
 WARNS=-Wextra -Wall -Wundef  -Wfloat-equal -Wshadow -Wpointer-arith -Wcast-align -Wstrict-prototypes -Wstrict-overflow=5 -Wwrite-strings -Waggregate-return -Wcast-qual -Wswitch-default -Wswitch-enum -Wconversion -Wunreachable-code
 # OMP_NUM_THREADS=12
 NP=6
+GUI=f
 ROWS=60
 COLS=60
 CFLAGS=$(WARNS) --std=c99 -O0 -lSDL2 # -fopenmp
@@ -13,7 +14,7 @@ build: src/main.c src/main-mpi.c src/simulation.h src/utils.h
 	mpicc src/main-mpi.c -o build/main-mpi $(CFLAGS)
 
 run: build/main
-	./build/main $(ROWS) $(COLS)
+	./build/main $(ROWS) $(COLS) $(GUI)
 
 run-mpi: build/main-mpi
 	mpirun -np $(NP) ./build/main-mpi $(ROWS) $(COLS)
