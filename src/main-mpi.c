@@ -37,15 +37,16 @@ int main(int argc, char const *argv[])
 
     if (rank == MASTER_RANK)
     {
-        if (argc < 3)
+        if (argc < 4)
         {
-            fprintf(stderr, "Usage: %s <rows> <cols>\n", argv[0]);
+            fprintf(stderr, "Usage: %s <rows> <cols> <t|f>", argv[0]);
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
     }
 
     int rows = atoi(argv[1]);
     int cols = atoi(argv[2]);
+    bool use_gui = (*argv[3]) == 't';
 
     if (rank == MASTER_RANK)
     {
@@ -64,7 +65,7 @@ int main(int argc, char const *argv[])
     // SDL Setup
     SDL_Window *window;
     SDL_Renderer *rend;
-    if (rank == MASTER_RANK)
+    if (rank == MASTER_RANK && use_gui)
     {
         window = SDL_CreateWindow("COVID-19 Simulator",
                                   SDL_WINDOWPOS_CENTERED,
@@ -163,12 +164,12 @@ int main(int argc, char const *argv[])
     }
 
     Uint32 sim_speed = 0;
-    if (rank == MASTER_RANK)
+    if (rank == MASTER_RANK && use_gui)
         sim_speed = 10;
     for (int sim_t = 0; sim_t < SIM_LIMIT; sim_t++)
     {
         // Rendering on master rank
-        if (rank == MASTER_RANK)
+        if (rank == MASTER_RANK && use_gui)
         {
             // Handle events
             SDL_Event event;
@@ -277,7 +278,8 @@ int main(int argc, char const *argv[])
             // Debugging
             DEBUG_PRINT("\n\tTime: %d\n\tSpeed: %d\n", sim_t, sim_speed);
 
-            SDL_Delay(1000 / sim_speed);
+            if (use_gui)
+                SDL_Delay(1000 / sim_speed);
         }
 
         MPI_Bcast(&sim_t, 1, MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
@@ -297,8 +299,14 @@ int main(int argc, char const *argv[])
     free(my_matrix);
     free(my_upd_matrix);
 
-    if (rank == MASTER_RANK)
+    if (rank == MASTER_RANK && use_gui)
+    {
+        SDL_DestroyRenderer(rend);
+        SDL_DestroyWindow(window);
         SDL_Quit();
+    }
+
     MPI_Finalize();
+
     return 0;
 }
