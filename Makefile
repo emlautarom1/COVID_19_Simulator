@@ -11,10 +11,11 @@ CFLAGS=$(WARNS) --std=c99 $(SLOW) -lSDL2
 info:
 	@ echo "Info: Covid-19 Simulator"
 
-build: src/main.c src/main-mpi.c src/main-omp.c src/simulation.h src/utils.h
+build: src/main.c src/main-mpi.c src/main-omp.c src/main-hyb.c src/simulation.h src/utils.h
 	gcc src/main.c -o build/main $(CFLAGS)
 	mpicc src/main-mpi.c -o build/main-mpi $(CFLAGS)
 	gcc src/main-omp.c -o build/main-omp $(CFLAGS) -fopenmp
+	mpicc src/main-hyb.c -o build/main-hyb $(CFLAGS) -fopenmp
 
 run: build/main
 	./build/main $(ROWS) $(COLS) $(GUI)
@@ -24,6 +25,9 @@ run-mpi: build/main-mpi
 
 run-omp: build/main-omp
 	./build/main-omp $(ROWS) $(COLS) $(GUI)
+
+run-hyb: build/main-hyb
+	mpirun -np $(NP) ./build/main-hyb $(ROWS) $(COLS) $(GUI)
 
 bench: src/main.c src/simulation.h src/utils.h
 	gcc src/main.c -o build/main -pg $(CFLAGS)
