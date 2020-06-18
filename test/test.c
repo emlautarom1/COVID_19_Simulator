@@ -106,6 +106,13 @@ void custom_data_types(int nprocs, int rank)
     }
 }
 
+void init_int_matrix(int *m, int w, int h)
+{
+    for (int i = 0; i < h; i++)
+        for (int j = 0; j < w; j++)
+            m[i * w + j] = i * w + j;
+}
+
 void sending_frontiers(int nprocs, int rank)
 {
     /*
@@ -169,11 +176,9 @@ void sending_frontiers(int nprocs, int rank)
     {
         printf("Rows/proc: %d\n", rows_per_proc);
 
-        matrix = malloc((size_t)((rows + padding) * cols) * sizeof(int));
         // Init the matrix
-        for (int i = 0; i < rows; i++)
-            for (int j = 0; j < cols; j++)
-                matrix[(i + 1) * cols + j] = i * cols + j;
+        matrix = malloc((size_t)((rows + padding) * cols) * sizeof(int));
+        init_int_matrix(&matrix[cols], cols, rows);
 
         // Copy the frontiers
         // Last to first
