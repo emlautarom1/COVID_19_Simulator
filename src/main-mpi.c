@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <mpi.h>
 
 #define DEBUG true
@@ -43,6 +44,8 @@ int main(int argc, char const *argv[])
     // Init random number generation
     srand(__rand_seed__);
 
+    MPI_Datatype MPI_COVID19_CELL;
+
     int rows_per_proc = (rows / nprocs) + R_PADDING;
     Cell *my_matrix = malloc((size_t)(rows_per_proc * cols) * sizeof(Cell));
     Cell *my_upd_matrix = malloc((size_t)(rows_per_proc * cols) * sizeof(Cell));
@@ -79,47 +82,73 @@ int main(int argc, char const *argv[])
             recvcounts[i] = (rows_per_proc - R_PADDING) * cols;
             displacements[i] = i * (rows_per_proc - R_PADDING) * cols;
         }
-        DEBUG_PRINT("Master rank setup dance complete\n");
 
-        // TODO: Register Cell as a MPI type
+        DEBUG_PRINT("Displacements: \n");
+        for (int i = 0; i < nprocs; i++)
+            printf("%d ", displacements[i]);
+        printf("\n");
+
+        int mpi_cell_block_lengths[] = {1, 1, 1, 1, 1, 1, 1};
+        MPI_Aint mpi_cell_displacements[] = {
+            offsetof(Cell, age),
+            offsetof(Cell, risk_disease),
+            offsetof(Cell, risk_job),
+            offsetof(Cell, vaccinated),
+            offsetof(Cell, gender),
+            offsetof(Cell, status),
+            offsetof(Cell, contagion_t)};
+        MPI_Datatype mpi_cell_lengths[] = {
+            MPI_INT,    // age
+            MPI_C_BOOL, // risk_disease
+            MPI_C_BOOL, // risk_job
+            MPI_C_BOOL, // vaccinated
+            MPI_INT,    // gender
+            MPI_INT,    // status
+            MPI_INT     // contagion_t
+        };
+        MPI_Type_create_struct(
+            7, // Number of fields in 'Cell'
+            mpi_cell_block_lengths,
+            mpi_cell_displacements,
+            mpi_cell_lengths,
+            &MPI_COVID19_CELL);
+        MPI_Type_commit(&MPI_COVID19_CELL);
+
+        DEBUG_PRINT("Master rank setup dance complete\n");
     }
 
-    for (int sim_t = 0; sim_t < 120; sim_t++)
+    // Send to each proc the appropiate rows
+    MPI_Scatterv(
+        matrix,
+        sendcounts,
+        displacements,
+        MPI_COVID19_CELL,
+        my_matrix,
+        rows_per_proc * cols,
+        MPI_COVID19_CELL,
+        0,
+        MPI_COMM_WORLD);
+
+    // TODO: Do work on each proc
+    memcpy(my_upd_matrix, my_matrix, (size_t)(rows_per_proc * cols) * sizeof(Cell));
+
+    // Gather the updated matrix on the master proc
+    MPI_Gatherv(
+        &my_upd_matrix[cols],
+        (rows_per_proc - R_PADDING) * cols,
+        MPI_COVID19_CELL,
+        &upd_matrix[cols],
+        recvcounts,
+        displacements,
+        MPI_COVID19_CELL,
+        0,
+        MPI_COMM_WORLD);
+
+    if (rank == MASTER_RANK)
     {
-        // Send to each proc the appropiate rows
-        MPI_Scatterv(
-            matrix,
-            sendcounts,
-            displacements,
-            MPI_INT,
-            my_matrix,
-            rows_per_proc * cols,
-            MPI_INT,
-            0,
-            MPI_COMM_WORLD);
-
-        // TODO: Do work on each proc
-
-        // Gather the updated matrix on the master proc
-        MPI_Gatherv(
-            &my_matrix[cols],
-            (rows_per_proc - R_PADDING) * cols,
-            MPI_INT,
-            &upd_matrix[cols],
-            recvcounts,
-            displacements,
-            MPI_INT,
-            0,
-            MPI_COMM_WORLD);
-
-        if (rank == MASTER_RANK)
-        {
-            void *temp = matrix;
-            matrix = upd_matrix;
-            upd_matrix = temp;
-
-            DEBUG_PRINT("\n\tTime: %d\n", sim_t);
-        }
+        void *temp = matrix;
+        matrix = upd_matrix;
+        upd_matrix = temp;
     }
 
     // Cleanup
