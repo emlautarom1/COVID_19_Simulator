@@ -4,7 +4,9 @@ NP=6
 GUI=t # f
 ROWS=60
 COLS=60
-CFLAGS=$(WARNS) --std=c99 -O0 -lSDL2 # -fopenmp
+FAST=-O3 -DDEBUG=0 -DNDEBUG
+SLOW=-O0 -DDEBUG=1
+CFLAGS=$(WARNS) --std=c99 $(SLOW) -lSDL2  # -fopenmp
 
 info:
 	@ echo "Info: Covid-19 Simulator"
