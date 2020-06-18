@@ -1,16 +1,20 @@
 WARNS=-Wextra -Wall -Wundef  -Wfloat-equal -Wshadow -Wpointer-arith -Wcast-align -Wstrict-prototypes -Wstrict-overflow=5 -Wwrite-strings -Waggregate-return -Wcast-qual -Wswitch-default -Wswitch-enum -Wconversion -Wunreachable-code
-CC=mpicc
 # OMP_NUM_THREADS=12
-CFLAGS=$(WARNS) --std=c99 -O0 -lSDL2 -lm # -fopenmp
+NP=3
+CFLAGS=$(WARNS) --std=c99 -O0# -fopenmp
 
 info:
 	@ echo "Info: Covid-19 Simulator"
 
-build: src/main.c src/simulation.h src/utils.h
-	$(CC) src/main.c -o build/main $(CFLAGS) 
+build: src/main.c src/main-mpi.c src/simulation.h src/utils.h
+	gcc src/main.c -o build/main $(CFLAGS) -lSDL2 
+	mpicc src/main-mpi.c -o build/main-mpi $(CFLAGS)
 
 run: build/main
 	./build/main
+
+run-mpi: build/main-mpi
+	mpirun -np $(NP) ./build/main-mpi
 
 bench: src/main.c src/simulation.h src/utils.h
 	$(CC) src/main.c -o build/main -pg $(CFLAGS)
@@ -19,8 +23,8 @@ bench: src/main.c src/simulation.h src/utils.h
 	rm gmon.out
 
 test: test/test.c
-	$(CC) test/test.c -o build/test $(CFLAGS)
-	mpirun build/test
+	mpicc test/test.c -o build/test $(CFLAGS)
+	mpirun -np $(NP) build/test
 
 .PHONY: clean
 clean:
