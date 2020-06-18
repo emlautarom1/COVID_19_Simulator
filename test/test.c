@@ -126,6 +126,25 @@ void fill_int_matrix_with(int *m, int w, int h, int e)
             m[i * w + j] = e;
 }
 
+void padded_neighbors(void)
+{
+    /*
+        Given a Matrix M ((m + 2) x n)
+        Access each cell neighbor:
+        ~ The first and last index are not used
+        ? Use a displacement for accessing? Ex: (i, j) -> (i + n, j)
+
+            Row IDX
+                    ┌───┬───┬───┐
+               0    │ 6 │ 7 │ 8 │ <- row 3
+               1    │ 0 │ 1 │ 2 │ <┐
+               2    │ 3 │ 4 │ 5 │  │ 3 rows 
+               3    │ 6 │ 7 │ 8 │ <┘
+               4    │ 0 │ 1 │ 2 │ <- row 1
+                    └───┴───┴───┘
+    */
+}
+
 void sending_frontiers(int nprocs, int rank)
 {
     /*
