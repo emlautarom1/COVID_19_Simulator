@@ -22,7 +22,7 @@ run-mpi: build/main-mpi
 	mpirun -np $(NP) ./build/main-mpi $(ROWS) $(COLS) $(GUI)
 
 bench: src/main.c src/simulation.h src/utils.h
-	$(CC) src/main.c -o build/main -pg $(CFLAGS)
+	gcc src/main.c -o build/main -pg $(CFLAGS)
 	./build/main 1500 1500 f
 	@gprof build/main gmon.out > benchmark/$$(date +'%F_%k-%M')_bench.txt
 	rm gmon.out
