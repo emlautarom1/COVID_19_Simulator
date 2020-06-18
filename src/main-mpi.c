@@ -15,10 +15,10 @@
 #define CELL_SIZE 10
 
 #define MASTER_RANK 0
+#define R_PADDING 2
 
 #define MAX_SPEED 30
 #define SIM_LIMIT 120
-#define R_PADDING 2
 
 #include "utils.h"
 #include "simulation.h"
