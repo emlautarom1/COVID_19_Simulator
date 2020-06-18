@@ -6,10 +6,12 @@ ROWS=60
 COLS=60
 FAST=-O3 -DDEBUG=0 -DNDEBUG
 SLOW=-O0 -DDEBUG=1
+# Select SLOW or FAST depending on your test case
 CFLAGS=$(WARNS) --std=c99 $(SLOW) -lSDL2
 
 info:
 	@ echo "Info: Covid-19 Simulator"
+	@ echo "See README.md for more info"
 
 build: src/main.c src/main-mpi.c src/main-omp.c src/main-hyb.c src/simulation.h src/utils.h
 	gcc src/main.c -o build/main $(CFLAGS)
