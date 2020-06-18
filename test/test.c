@@ -126,6 +126,18 @@ void fill_int_matrix_with(int *m, int w, int h, int e)
             m[i * w + j] = e;
 }
 
+void int_circular_neighbors(int *m, int w, int h, int x, int y, int **out_b)
+{
+    out_b[0] = &m[((y - 1 + h) % h) * w + (x - 1 + w) % w];
+    out_b[1] = &m[((y - 1 + h) % h) * w + (x - 0 + w) % w];
+    out_b[2] = &m[((y - 1 + h) % h) * w + (x + 1 + w) % w];
+    out_b[3] = &m[((y - 0 + h) % h) * w + (x - 1 + w) % w];
+    out_b[4] = &m[((y + 0 + h) % h) * w + (x + 1 + w) % w];
+    out_b[5] = &m[((y + 1 + h) % h) * w + (x - 1 + w) % w];
+    out_b[6] = &m[((y + 1 + h) % h) * w + (x + 0 + w) % w];
+    out_b[7] = &m[((y + 1 + h) % h) * w + (x + 1 + w) % w];
+}
+
 void padded_neighbors(void)
 {
     /*
@@ -143,6 +155,30 @@ void padded_neighbors(void)
                4    │ 0 │ 1 │ 2 │ <- row 1
                     └───┴───┴───┘
     */
+    int m = 3;
+    int n = 3;
+    int *padded_matrix = malloc((size_t)((m + 2) * n) * sizeof(int));
+    for (int i = 0; i < m + 2; i++)
+        for (int j = 0; j < n; j++)
+            padded_matrix[i * n + j] = ((i * n) + j + 6) % (m * n);
+
+    print_int_matrix(&padded_matrix[n], n, m);
+
+    int x = 0;
+    int y = 2;
+    int *neighbors[8];
+
+    int_circular_neighbors(
+        &padded_matrix[n], // Ignore the padding row
+        n,                 // Respect the original width
+        m,                 // and original heigth
+        x + n,             // Offset the 'x' position by the first padding row
+        y,                 // Respect the 'y' position
+        neighbors);
+    printf("(%d, %d) neighboors: ", x, y);
+    for (int i = 0; i < 8; i++)
+        printf("%d ", (*neighbors[i]));
+    printf("\n");
 }
 
 void sending_frontiers(int nprocs, int rank)
@@ -306,7 +342,9 @@ int main(void)
         printf("[DBG] Running tests with %d procs...\n\n", nprocs);
 
     // custom_data_types(nprocs, rank);
-    sending_frontiers(nprocs, rank);
+    // sending_frontiers(nprocs, rank);
+    if (rank == 0)
+        padded_neighbors();
 
     MPI_Finalize();
     return 0;
