@@ -127,8 +127,33 @@ int main(int argc, char const *argv[])
         0,
         MPI_COMM_WORLD);
 
-    // TODO: Do work on each proc
+    // Per proc processing
     memcpy(my_upd_matrix, my_matrix, (size_t)(rows_per_proc * cols) * sizeof(Cell));
+    int sim_t = 0;
+    for (int i = 0; i < rows_per_proc - R_PADDING; i++)
+    {
+        for (int j = 0; j < cols; j++)
+        {
+            Cell *current = &my_upd_matrix[cols + (i * cols) + j];
+            if (current->status == SUSC_BLUE)
+            {
+                neighbors(my_matrix, cols, rows_per_proc, j, i + 1, my_buff_neighbors);
+                susceptible_to_sick_rule(current, my_buff_neighbors, sim_t);
+            }
+            if (current->status == SICK_NC_ORANGE)
+            {
+                sick_to_contagious_rule(current, sim_t);
+            }
+            if (current->status == SICK_C_RED)
+            {
+                contagious_to_isolated_rule(current, sim_t);
+            }
+            if (is_sick(*current) && (sim_t - current->contagion_t) == 14)
+            {
+                live_or_die_rule(current);
+            }
+        }
+    }
 
     // Gather the updated matrix on the master proc
     MPI_Gatherv(
@@ -141,6 +166,11 @@ int main(int argc, char const *argv[])
         MPI_COVID19_CELL,
         0,
         MPI_COMM_WORLD);
+
+    // Pointer dance per proc
+    void *my_temp = my_matrix;
+    my_matrix = my_upd_matrix;
+    my_upd_matrix = my_temp;
 
     if (rank == MASTER_RANK)
     {
