@@ -1,6 +1,6 @@
 WARNS=-Wextra -Wall -Wundef  -Wfloat-equal -Wshadow -Wpointer-arith -Wcast-align -Wstrict-prototypes -Wstrict-overflow=5 -Wwrite-strings -Waggregate-return -Wcast-qual -Wswitch-default -Wswitch-enum -Wconversion -Wunreachable-code
 # OMP_NUM_THREADS=12
-NP=6
+NP=4
 GUI=t # f
 ROWS=60
 COLS=60
@@ -31,11 +31,8 @@ run-omp: build/main-omp
 run-hyb: build/main-hyb
 	mpirun -np $(NP) ./build/main-hyb $(ROWS) $(COLS) $(GUI)
 
-bench: src/main.c src/simulation.h src/utils.h
-	gcc src/main.c -o build/main -pg $(CFLAGS)
-	./build/main 1500 1500 f
-	@ gprof build/main gmon.out > benchmark/$$(date +'%F_%k-%M')_bench.txt
-	@ rm gmon.out
+bench: build
+	@ bash benchmark/run_all.sh
 
 test: test/test.c
 	mpicc test/test.c -o build/test $(CFLAGS)
@@ -44,4 +41,4 @@ test: test/test.c
 .PHONY: clean
 clean:
 	@ -rm -f build/*
-	@ -rm -f benchmark/*
+	@ -rm -f benchmark/*.html
