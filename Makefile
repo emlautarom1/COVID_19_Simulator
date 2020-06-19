@@ -1,6 +1,6 @@
 WARNS=-Wextra -Wall -Wundef  -Wfloat-equal -Wshadow -Wpointer-arith -Wcast-align -Wstrict-prototypes -Wstrict-overflow=5 -Wwrite-strings -Waggregate-return -Wcast-qual -Wswitch-default -Wswitch-enum -Wconversion -Wunreachable-code
 # OMP_NUM_THREADS=12
-NP=4
+NP=6
 GUI=t # f
 ROWS=60
 COLS=60
