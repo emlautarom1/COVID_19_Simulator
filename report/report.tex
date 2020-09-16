@@ -1,0 +1,358 @@
+\documentclass[a4paper,12pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{amsmath}
+\usepackage{textcomp}
+\usepackage{authblk}
+\usepackage{microtype}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage[outputdir=build]{minted}
+
+\setlength{\parskip}{0.5em}
+\lstset{basicstyle=\ttfamily,breaklines=true}
+\usemintedstyle{vs}
+
+\begin{document}
+
+\title{\textbf{Sistemas Distribuidos - Práctico de Máquina}}
+\author{EMANUEL, Lautaro Martín}
+\affil{UNSL, San Luis, Argentina}
+\date{Junio 2020}
+\maketitle
+
+\tableofcontents
+\pagebreak
+
+\section{Introducción}
+
+Entiéndase por computación paralela a aquella computación donde distintas tareas colaboran en forma simultánea en resolver
+un problema.
+
+La computación paralela enfatiza los siguientes aspectos:
+\begin{itemize}
+    \item Una aplicación es dividida en sub-tareas, las cuales son resueltas simultáneamente (generalmente en forma fuertemente acoplada).
+    \item Una aplicación por vez es resuelta y el objetivo es la velocidad de procesamiento de dicha aplicación.
+\end{itemize}
+
+Durante el siguiente trabajo se pretende comprender la problemática asociada al diseño e implementación de buenos sistemas paralelos, debiendo integrar los conceptos vistos en la materia de \textbf{Sistemas Distribuidos y Paralelos}, justificando las decisiones de diseño e implementación y los resultados obtenidos.
+
+\section{Simulador COVID-19}
+
+La actividad requiere implementar un sencillo simulador de la difusión del COVID-19 -- apropiado al contexto actual -- en una población estática, utilizando el lenguaje de programación C.
+
+Para esto se elabora una cuadrilla simétrica cuyas celdas representan personas o ''espacios vacíos'', las cuales se identifican visualmente por medio de los siguientes colores:
+\begin{description}[leftmargin=!]
+    \item \textbf{Blanco}: No representa a una persona sino un ''espacio vacío''.
+    \item \textbf{Azul}: Una persona susceptible a enfermarse
+    \item \textbf{Naranja}: Una persona enferma incapaz -- por el momento -- de contagiar.
+    \item \textbf{Rojo}: Una persona enferma que puede transmitir la enfermedad.
+    \item \textbf{Amarillo}: Una persona enferma que se encuentra aislada, por lo que no puede transmitir la enfermedad.
+    \item \textbf{Verde}: Un paciente curado.
+    \item \textbf{Negro}: Fallecido a causa de la enfermedad.
+\end{description}
+
+Cada celda que represente una persona a su vez cuenta con cierta información adicional:
+\begin{description}[leftmargin=!]
+    \item \textbf{Edad}: Clasificada en \verb|Niño|, \verb|Adulto| y \verb|Anciano|.
+    \item \textbf{Enfermo de Riesgo}: Cuenta con alguna enfermedad previa, como diabetes o hipertensión.
+    \item \textbf{Profesión de Riesgo}: Ejerce alguna profesión riesgosa, como chofer, médico o cajero.
+    \item \textbf{Vacunado}: Cuenta con las vacunas correspondientes a su edad.
+    \item \textbf{Sexo}: Clasificada en \verb|Masculino| o \verb|Femenino|.
+\end{description}
+
+En esta simulación existe un \textbf{reloj virtual de cómputo} que conduce la evolución a lo largo del tiempo del modelo planteado. Esto significa que, a cada señal de reloj, cada una de las celdas de la cuadrilla -- ignorando aquellos ''espacios vacías'' -- puede cambiar su estado de salud a uno nuevo por medio de una serie de reglas preestablecidas, las cuales tendrá en cuenta la edad,
+grupo de riesgo, sexo, vacunas previas y el estado de salud de sus vecinos inmediatos, con cierto factor de aleatoriedad.
+
+Este reloj modela los días que transcurren en la simulación y, a fines de este trabajo, se simularán 120 días.
+
+\section{Implementación}
+
+En una primera instancia, se define un tipo \verb|Cell| el cual modela las celdas de la cuadrilla como se describieron previamente, junto con una serie de tipos \verb|enumeration|, acordes a los tipos de datos a tratar -- \verb|Gender|, \verb|Age|, entre otros.
+\begin{minted}{c}
+typedef struct Cell {
+    Age age;
+    bool risk_disease;
+    bool risk_job;
+    bool vaccinated;
+    Gender gender;
+    CellStatus status;
+    int contagion_t;
+} Cell;
+\end{minted}
+
+De manera breve podemos resumir la simulación utilizando el siguiente pseudocódigo:
+\begin{minted}{pascal}
+    reglas := reglas_actualizacion();
+    celdas := celdas_iniciales();
+    for reloj := 1 to 120 do
+    begin
+        celdas_actualizadas := copy(celdas);
+        for celda in celdas_actualizadas do
+        begin
+            vecinos := vecinos_de(celda, celdas);
+            actualizar_celda(celda, vecinos, reglas, reloj);
+        end.
+        celdas := celdas_actualizadas;
+    end.
+\end{minted}
+
+Es importante destacar una serie de elementos de este algoritmo:
+\begin{itemize}
+    \item En cada iteración se debe realizar una copia del estado actual de la cuadrícula, de forma que al modificar el tablero no se altere el estado de los vecinos. Nótese que los vecinos se calculan utilizando \verb|celdas| y la actualización de cada celda utilizando \verb|celdas_actualizadas|.
+    \item Al finalizar cada iteración se debe actualizar toda la cuadrícula, por lo que se reemplaza \verb|celdas| con \verb|celdas_actualizadas|.
+    \item El orden en que se actualiza cada celda en cada iteración es indistinto, por lo que se pueden realizar actualizaciones de manera paralela sin riesgos.
+\end{itemize}
+
+A continuación se dará una breve descripción de cada implementación de dicho algoritmo utilizando tres enfoques y tecnologías distintas: una implementación secuencial, utilizando procesos con \verb|OpenMPI| y una utilizando \verb|threads| con \verb|OpenMP|.
+
+\emph{Nota: Todo el código pertinente se encuentra adjunto a este documento.}
+
+\subsection{Secuencial}
+
+El pseudocódigo descrito previamente se puede traducir casi de manera inmediata a una implementación secuencial en C, salvando algunos detalles particulares de uso de punteros y asignación de memoria.
+
+En cada iteración sobre la cuadrilla evaluaremos el estado de la celda y, a partir de esta, aplicaremos la regla correspondiente. Véase el siguiente fragmento de código:
+
+\begin{minted}{c}
+    /* ... */
+    Cell *current = &upd_matrix[i * cols + j];
+    if (current->status == SUSC_BLUE)
+    {
+        neighbors(matrix, cols, rows, j, i, buff_neighbors);
+        susceptible_to_sick_rule(current, buff_neighbors, sim_t);
+    }
+    if (current->status == SICK_NC_ORANGE)
+    {
+        sick_to_contagious_rule(current, sim_t);
+    }
+    if (current->status == SICK_C_RED)
+    {
+        contagious_to_isolated_rule(current, sim_t);
+    }
+    if (is_sick(*current) && (sim_t - current->contagion_t) == 14)
+    {
+        live_or_die_rule(current);
+    }
+    /* ... */
+\end{minted}
+
+\subsection{OpenMP}
+
+\textbf{OpenMP} es una interfaz de programación de aplicaciones (API) para la programación multiproceso de memoria compartida en múltiples plataformas, la cual permite añadir concurrencia a los programas escritos en C, C++ y Fortran sobre la base del modelo de ejecución fork-join, por medio de un conjunto de directivas de compilador, rutinas de biblioteca, y variables de entorno que influyen el comportamiento en tiempo de ejecución.
+\newpage
+La librería de OpenMP ofrece un mecanismo sencillo para paralelizar el algoritmo dado teniendo en cuenta, como se mencionó previamente, que el orden de actualización de cada celda en una iteración dada de la simulación es irrelevante.
+
+De esta manera, solo se requiere agregar un \verb|#pragma|, es decir, una directiva del compilador para que este pueda paralelizar por medio de \verb|threads| el loop principal, como puede verse a continuación:
+
+\begin{minted}{c}
+    #pragma omp parallel for collapse(2)
+    for (int i = 0; i < rows; i++)
+    {
+        for (int j = 0; j < cols; j++)
+        {
+            Cell *current = &upd_matrix[i * cols + j];
+            if (current->status == SUSC_BLUE)
+            { /* ... */
+\end{minted}
+
+\subsection{OpenMPI}
+
+MPI (Message-Passing Interface) es una especificación de librerías de pasaje de mensajes, la cual se enfoca principalmente en el modelo de pasaje de mensajes para programación paralela, en el cual datos se mueven del espacio de memoria de un proceso al de otro por medio de operaciones cooperativas entre sí. MPI es, entonces:
+\begin{itemize}
+    \item Un estándar industrial para el modelo de pasaje de mensajes.
+    \item Una especificación, no una implementación.
+    \item Un modelo portable a través de diferentes arquitectura de computadoras.
+\end{itemize}
+La versión actual de la especificación es la versión 3.1 publicada en Junio de 2015.
+
+Durante este trabajo se hizo uso de la librería OpenMPI, la cual es una implementación abierta de la especificación MPI para lenguajes C y Fortran.
+
+\newpage
+
+La implementación del algoritmo utilizando pasaje de mensajes resulta más compleja, pero nos permite atacar el problema por medio de una paralelización más fuerte de los datos. Considere lo siguiente: es posible subdividir la cuadrilla en secciones más pequeñas, ya sea separándola en filas, columnas o pequeñas cuadrillas, y procesarlas de manera paralela. Cabe destacar un problema no menor, que es la necesidad de contar con la información de los vecinos, sea cual sea la subdivisión utilizada.
+
+Es posible plantear el siguiente algoritmo paralelo utilizando el pasaje de mensajes:
+
+\begin{minted}{pascal}
+    reglas := reglas_actualizacion();
+    celdas := celdas_iniciales();
+    secciones := calcular_secciones(celdas);
+    
+    mi_seccion; (* Cada proceso cuenta con sus propias secciónes *)
+    mi_seccion_actualizada;
+    
+    for reloj := 1 to 120 do
+    begin
+        enviar_secciones(mi_seccion, celdas, secciones);
+        
+        (* Cada proceso opera sobre su sección *)
+        mi_seccion_actualizada := copy(mi_seccion);
+        for celda in mi_seccion_actualizada do
+        begin
+            vecinos := vecinos_de(celda, mi_seccion);
+            actualizar_celda(celda, vecinos, reglas, reloj);
+        end.
+        mi_seccion := mi_seccion_actualizada;
+        
+        (* Es necesario reconstruir la cuadrilla *)
+        recuperar_secciones(mi_seccion, celdas_actualizadas, secciones);
+        celdas := celdas_actualizadas;
+    end.
+\end{minted}
+
+El algoritmo se asemeja a grandes rasgos al paralelo, pero con ciertas que son importantes de destacar:
+\begin{itemize}
+    \item Se debe hacer un cálculo previo de \emph{cómo} distribuir la cuadrilla entre todos los procesos existentes.
+    \item Se debe elegir alguna política para lidiar con los vecinos de las fronteras de cada sección.
+    \item Cada iteración requiere, en principio, distribuir las secciones correspondientes a cada proceso, y al completar el procesamiento de las mismas, recuperarlas en el proceso principal.
+\end{itemize}
+
+En esta implementación se decidió por dividir la cuadrilla en secciones de filas adyacentes, y en lo que respecta a los vecinos, se decidió por enviar a cada proceso a su vez las filas adyacentes a las fronteras de su correspondiente sección. Para simplificar el envío de tal información se decidió por duplicar las fronteras de la cuadrilla inicial.
+
+Considérese el siguiente ejemplo, con una cuadrilla de números.
+
+\begin{figure}[H]
+    \begin{minipage}{.5\linewidth}
+        \centering
+        \[
+            \begin{bmatrix}
+                0 & 1 & 2 \\
+                3 & 4 & 5 \\
+                6 & 7 & 8 \\
+            \end{bmatrix}
+        \]
+        Cuadrilla inicial
+    \end{minipage}
+    $\Rightarrow$
+    \begin{minipage}{.5\linewidth}
+        \centering
+        \[
+            \begin{bmatrix}
+                6 & 7 & 8 \\
+                0 & 1 & 2 \\
+                3 & 4 & 5 \\
+                6 & 7 & 8 \\
+                0 & 1 & 2 \\
+            \end{bmatrix}
+        \]
+        Con fronteras duplicadas
+    \end{minipage}%
+\end{figure}
+
+Supongamos ahora que contamos con tres procesadores y queremos enviar una fila a cada procesador, de forma tal que tenemos la siguiente distribución:
+
+\begin{description}
+    \item Proceso 0: $\begin{bmatrix} 0 & 1 & 2 \end{bmatrix}$
+    \item Proceso 1: $\begin{bmatrix} 3 & 4 & 5 \end{bmatrix}$
+    \item Proceso 2: $\begin{bmatrix} 6 & 7 & 8 \end{bmatrix}$
+\end{description}
+
+Resulta entonces trivial obtener la sección correspondiente a cada a partir de la cuadrilla con las fronteras duplicadas. Por ejemplo, para el \textbf{Proceso 0}:
+
+\begin{figure}[H]
+    \begin{minipage}{.5\linewidth}
+        \centering
+        \[
+            \begin{bmatrix}
+                6 & 7 & 8 \\
+                0 & 1 & 2 \\
+                3 & 4 & 5 \\
+                6 & 7 & 8 \\
+                0 & 1 & 2 \\
+            \end{bmatrix}
+        \]
+        Cuadrilla con fronteras duplicadas
+    \end{minipage}%
+    $\Rightarrow$
+    \begin{minipage}{.5\linewidth}
+        \centering
+        \[
+            \begin{bmatrix}
+                6 & 7 & 8 \\
+                0 & 1 & 2 \\
+                3 & 4 & 5 \\
+            \end{bmatrix}
+        \]
+        Sección completa del Proceso 0
+    \end{minipage}%
+\end{figure}
+
+\subsection{Híbrido}
+
+Por último se realizó una implementación híbrida que utiliza tanto procesos (OpenMPI) como \verb|threads| (OpenMP), la cual es similar a la implementación de OpenMPI pero con el correspondiente \verb|pragma| de OpenMP para paralelizar la actualización de las celdas correspondientes a la sección de cada proceso -- de la misma manera que en la implementación de OpenMP.
+
+\section{Resultados}
+
+A continuación se detallan los tiempos medios, máximos y mínimos de cada implementación luego de 10 ejecuciones con diferentes tamaños de cuadrillas, todas sobre el mismo equipo con las siguientes características:
+
+\begin{description}
+    \item \textbf{CPU}: Ryzen 5 3600 3.6/4.2 Ghz. 6 núcleos 12 hilos
+    \item \textbf{Memoria}: 2x8 GB DDR4 3000Mhz CL15
+    \item \textbf{Disco}: SSD Crucial BX500 240 Gb
+    \item \textbf{Sistema Operativo}: Elementary OS (variante de Ubuntu) 5.1.5 ''Hera''
+\end{description}
+
+Todas las implementaciones se compilaron utilizando el compilador GNU GCC 7.3 sin optimizaciones (\verb|-O0|). Las ejecuciones de OpenMPI se realizaron con 4 procesadores -- utilizando la opción \verb|-np 4| -- y las ejecuciones de OpenMP se realizaron con 12 hilos -- utilizando la variable de entorno \verb|OMP_NUM_THREADS=12|.
+
+\emph{Nota: Puede consultar en detalle los parámetros de compilación y ejecución en el archivo} \verb|Makefile| \emph{adjunto con el código fuente.}
+
+\begingroup
+\setlength{\tabcolsep}{12pt} % Default value: 6pt
+\renewcommand{\arraystretch}{1.5} % Default value: 1
+
+\begin{table}[H]
+    \begin{center}
+        \begin{tabular}{|c|c|c|c|c|}
+            \hline
+            \multicolumn{5}{|c|}{\textbf{Resultados}}
+            \\ \hline
+            \multirow{2}{*}{\textbf{Implementación}} & \multirow{2}{*}{\textbf{Cuadrilla}}   & \multicolumn{3}{c|}{\textbf{Tiempos}}
+            \\ \cline{3-5}
+                                                     &                                       & \emph{Mínimo}                         & \emph{Medio} & \emph{Máximo} \\
+            \hline
+            \multirow{3}{*}{Secuencial}              & \multicolumn{1}{c|}{200$\times$200}   & 195 ms                                & 198 ms       & 202 ms        \\
+                                                     & \multicolumn{1}{c|}{800$\times$800}   & 3.02 seg                              & 3.05 seg     & 3.10 seg      \\
+                                                     & \multicolumn{1}{c|}{1500$\times$1500} & 10.6 seg                              & 10.8 seg     & 10.9 seg      \\
+            \hline
+            \multirow{3}{*}{OpenMP}                  & \multicolumn{1}{c|}{200$\times$200}   & 117 ms                                & 128 ms       & 139 ms        \\
+                                                     & \multicolumn{1}{c|}{800$\times$800}   & 1.25 seg                              & 1.72 seg     & 2.28 seg      \\
+                                                     & \multicolumn{1}{c|}{1500$\times$1500} & 7.18 seg                              & 8.32 seg     & 9.41 seg      \\
+            \hline
+            \multirow{3}{*}{OpenMPI}                 & \multicolumn{1}{c|}{200$\times$200}   & 424 ms                                & 503 ms       & 564 ms        \\
+                                                     & \multicolumn{1}{c|}{800$\times$800}   & 3.69 seg                              & 3.91 seg     & 4.06 seg      \\
+                                                     & \multicolumn{1}{c|}{1500$\times$1500} & 13.1 seg                              & 13.3 seg     & 13.5 seg      \\
+            \hline
+            \multirow{3}{*}{Híbrida}                 & \multicolumn{1}{c|}{200$\times$200}   & 4.88 seg                              & 4.91 seg     & 4.94 seg      \\
+                                                     & \multicolumn{1}{c|}{800$\times$800}   & 7.94 seg                              & 8.09 seg     & 8.22 seg      \\
+                                                     & \multicolumn{1}{c|}{1500$\times$1500} & 15.8 seg                              & 17.2 seg     & 18.7 seg      \\
+            \hline
+        \end{tabular}
+    \end{center}
+\end{table}
+
+\endgroup
+
+A partir de estos datos calculamos el \emph{speedup} que existe entre las implementaciones Secuencial y OpenMPI, tomando como referencia la cuadrilla de 1500$\times$1500:
+
+\[ Speedup = \frac{Secuencial_{min}}{OpenMPI_{medio}} = \frac{10.6\,seg}{13.3\,seg} \approx 0.80 \]
+
+Teniendo en cuenta que utilizamos 4 procesadores, calculamos entonces la \emph{eficiencia}:
+
+\[ Eficiencia = \frac{Speedup}{{N\textsuperscript{\underline{o}}} Procesadores} = \frac{0.80}{4} = 0.2 \]
+
+Como podrá observarse, los resultados resultan poco atractivos.
+
+\section{Conclusiones}
+
+El uso de procesos por medio de OpenMPI, cuyo uso requirió de mucho mas tiempo de desarrollo, resultó en un peor rendimiento que una implementación Secuencial, con tiempos consistentemente peores en todo tipo de cuadrillas. Es posible que la causa de este pobre rendimiento sea que el costo de comunicar los datos entre los procesos conlleva mas tiempo que el ganado al dividir en secciones la cuadrilla.
+
+Por otra parte, la implementación de OpenMP -- utilizando \verb|threads| -- arroja mejores resultados en todas las ocasiones y, teniendo en cuenta el costo que implementar tal tecnología conlleva -- una sola línea de código --, podemos decir sin lugar a dudas que resulta ser la ''ganadora'' entre las implementaciones de las aquí presentadas.
+
+En última instancia, la implementación Híbrida arroja los peores resultados, en tardando aproximadamente un \%\,60 más que la implementación Secuencial -- 17.2 seg. vs.  10.8 seg. respectivamente.
+
+Como comentario final, es necesario remarcar que todas las pruebas se realizaron sobre ejecutables sin optimizaciones del compilador (\lstinline{-O0}). En caso de configurar el compilador con máximas optimizaciones (\lstinline{-03}), la implementación Secuencial resulta la más veloz en todas las pruebas -- \emph{y sin requerir esfuerzo alguno por parte del programador}.
+
+\end{document}
